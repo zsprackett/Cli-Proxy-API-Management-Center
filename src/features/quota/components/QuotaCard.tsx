@@ -22,6 +22,7 @@ import {
 import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
+import { maskIdentity } from '../ledgerModel';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import bodyStyles from './QuotaBody.module.scss';
 import styles from './QuotaCard.module.scss';
@@ -33,6 +34,8 @@ export type QuotaCardProps = {
   entry: QuotaFileEntry;
   quota?: QuotaCardState;
   resolvedTheme: ResolvedTheme;
+  /** False masks the account identifier in the filename. */
+  showIdentity?: boolean;
   canRefresh: boolean;
   resetting: boolean;
   /** 首屏级联入场延迟；null = 不入场（切 tab / 翻页 / 刷新新挂载的卡片）。 */
@@ -46,6 +49,7 @@ export function QuotaCard(props: QuotaCardProps) {
     entry,
     quota,
     resolvedTheme,
+    showIdentity = true,
     canRefresh,
     resetting,
     entranceDelayMs,
@@ -55,7 +59,8 @@ export function QuotaCard(props: QuotaCardProps) {
   const { t } = useTranslation();
   const adapter = QUOTA_ADAPTERS[entry.type];
   const file = entry.file;
-  const displayName = getQuotaDisplayName(file);
+  const fullName = getQuotaDisplayName(file);
+  const displayName = showIdentity ? fullName : maskIdentity(fullName);
 
   // 挂载时捕获一次延迟：后续 props 变 null 不影响本卡（React 19 禁渲染期读 ref）
   const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);

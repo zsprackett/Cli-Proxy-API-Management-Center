@@ -63,6 +63,15 @@ describe('quota ui state', () => {
     expect(readQuotaUiState()).toEqual({ tab: 'kimi', sortMode: 'soonest' });
   });
 
+  test('round-trips the view mode and identity toggle', () => {
+    writeQuotaUiState({ viewMode: 'cards', showIdentities: true });
+    expect(readQuotaUiState()).toMatchObject({ viewMode: 'cards', showIdentities: true });
+
+    storage.setItem(KEY, JSON.stringify({ viewMode: 'mosaic', showIdentities: 'yes' }));
+    expect(readQuotaUiState()?.viewMode).toBeUndefined();
+    expect(readQuotaUiState()?.showIdentities).toBeUndefined();
+  });
+
   test('rejects values that are not part of the current contract', () => {
     storage.setItem(KEY, JSON.stringify({ tab: 'not-a-tab', sortMode: 'by-vibes' }));
     expect(readQuotaUiState()).toEqual({ tab: undefined, sortMode: undefined });

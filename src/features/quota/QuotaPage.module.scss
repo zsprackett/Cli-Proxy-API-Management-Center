@@ -121,8 +121,19 @@
 
 .sort {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 148px;
   max-width: 100%;
+
+  > div {
+    min-width: 132px;
+  }
+}
+
+.identityToggle {
+  white-space: nowrap;
 
   button[aria-haspopup='listbox'] {
     height: 36px;
@@ -165,6 +176,10 @@
   .clearSearch {
     width: 36px;
     height: 36px;
+  }
+
+  .sort {
+    flex-wrap: wrap;
   }
 
   .sort button[aria-haspopup='listbox'] {
