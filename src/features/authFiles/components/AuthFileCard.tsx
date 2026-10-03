@@ -35,6 +35,7 @@ import { resolveAuthFileQuotaType } from '@/features/authFiles/logic';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
 import { AuthFileCooldownSection } from './AuthFileCooldownSection';
+import { PlanBadge } from './PlanBadge';
 import styles from './AuthFileCard.module.scss';
 
 export type AuthFileCardProps = {
@@ -162,14 +163,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
           >
             {identity.primary}
           </span>
-          {planLabel && (
-            <span
-              className={styles.planBadge}
-              title={t('auth_files.plan_badge', { plan: planLabel })}
-            >
-              {planLabel}
-            </span>
-          )}
+          {planLabel && <PlanBadge label={planLabel} />}
         </h3>
         {isRuntimeOnly && (
           <span className={styles.runtimeLabel}>{t('auth_files.type_virtual')}</span>
