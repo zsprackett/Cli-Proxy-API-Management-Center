@@ -234,6 +234,7 @@
     "file_size": "Size",
     "file_modified": "Modified",
     "card_select": "Select credential {{name}}",
+    "plan_badge": "Plan: {{plan}}",
     "card_toggle": "Enable credential {{name}}",
     "card_requests": "Requests",
     "cooldown_unknown": "Cooldown state unknown",

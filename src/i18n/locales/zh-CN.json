@@ -234,6 +234,7 @@
     "file_size": "大小",
     "file_modified": "修改时间",
     "card_select": "选择认证文件 {{name}}",
+    "plan_badge": "套餐：{{plan}}",
     "card_toggle": "启用认证文件 {{name}}",
     "card_requests": "请求记录",
     "cooldown_unknown": "冷却状态未知",

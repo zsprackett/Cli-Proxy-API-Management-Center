@@ -30,6 +30,7 @@ import {
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
+import { resolveAuthFilePlan } from '@/features/authFiles/plan';
 import { resolveAuthFileQuotaType } from '@/features/authFiles/logic';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
@@ -113,6 +114,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   // 主行显示账号（email/项目 ID），文件名降为满卡宽的 mono 副行
   const identity = deriveAuthFileIdentity(file);
+  const plan = resolveAuthFilePlan(file);
+  const planLabel = plan ? t(plan.labelKey, { defaultValue: plan.fallback }) : '';
 
   // 挂载时捕获一次入场延迟：父级随后传 null 也不会中断已开始的动画
   const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);
@@ -159,6 +162,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
           >
             {identity.primary}
           </span>
+          {planLabel && (
+            <span
+              className={styles.planBadge}
+              title={t('auth_files.plan_badge', { plan: planLabel })}
+            >
+              {planLabel}
+            </span>
+          )}
         </h3>
         {isRuntimeOnly && (
           <span className={styles.runtimeLabel}>{t('auth_files.type_virtual')}</span>
