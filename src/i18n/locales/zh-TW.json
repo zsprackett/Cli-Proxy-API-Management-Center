@@ -234,6 +234,7 @@
     "file_size": "大小",
     "file_modified": "修改時間",
     "card_select": "選取驗證檔案 {{name}}",
+    "plan_badge": "方案：{{plan}}",
     "card_toggle": "啟用驗證檔案 {{name}}",
     "card_requests": "請求記錄",
     "cooldown_unknown": "冷卻狀態未知",

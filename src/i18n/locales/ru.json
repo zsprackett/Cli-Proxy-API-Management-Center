@@ -233,6 +233,7 @@
     "file_size": "Размер",
     "file_modified": "Изменён",
     "card_select": "Выбрать файл авторизации {{name}}",
+    "plan_badge": "Тариф: {{plan}}",
     "card_toggle": "Включить файл авторизации {{name}}",
     "card_requests": "Запросы",
     "cooldown_unknown": "Состояние задержки неизвестно",
