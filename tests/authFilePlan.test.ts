@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import i18n from '@/i18n';
 import { resolveAuthFilePlan } from '@/features/authFiles/plan';
+import { QuotaLedger, type LedgerItem } from '@/features/quota/components/QuotaLedger';
+import type { LedgerRowData } from '@/features/quota/ledgerModel';
+import type { AuthFileItem } from '@/types';
 
 describe('resolveAuthFilePlan', () => {
   test('reads the plan the backend recorded on a Claude credential', () => {
@@ -55,7 +61,65 @@ describe('auth file card plan badge', () => {
     );
     const header = source.split('<header')[1].split('</header>')[0];
     expect(source).toContain('resolveAuthFilePlan(file)');
-    expect(header).toContain('styles.planBadge');
-    expect(header).toContain("t('auth_files.plan_badge', { plan: planLabel })");
+    expect(header).toContain('<PlanBadge label={planLabel} />');
+  });
+});
+
+describe('quota ledger plan badge', () => {
+  const renderLedger = (file: AuthFileItem, row: LedgerRowData) => {
+    const item: LedgerItem = {
+      entry: { file, type: 'claude' },
+      credential: {
+        key: file.name,
+        name: file.name,
+        provider: 'claude',
+        disabled: false,
+        coolingDown: false,
+        row,
+      },
+    };
+    return renderToStaticMarkup(
+      createElement(QuotaLedger, {
+        items: [item],
+        resolvedTheme: 'dark',
+        nowMs: Date.UTC(2026, 9, 2),
+        showIdentities: true,
+        canRefresh: () => true,
+        nextPickKeys: new Set<string>(),
+        onRefresh: () => {},
+      })
+    );
+  };
+  const observedRow: LedgerRowData = {
+    source: 'observed',
+    windows: [],
+    planType: null,
+    observedAtMs: Date.UTC(2026, 9, 2),
+  };
+
+  test('shows the recorded plan before live quota is loaded', async () => {
+    await i18n.changeLanguage('en');
+    const html = renderLedger(
+      { name: 'claude-a.json', type: 'claude', plan_type: 'max' },
+      observedRow
+    );
+    expect(html).toContain('title="Plan: Max"');
+    expect(html).toContain('>Max</span>');
+  });
+
+  test('prefers the live plan over the recorded one', async () => {
+    await i18n.changeLanguage('en');
+    const html = renderLedger(
+      { name: 'claude-a.json', type: 'claude', plan_type: 'max' },
+      { ...observedRow, source: 'live', planType: 'plan_team', observedAtMs: null }
+    );
+    expect(html).toContain('title="Plan: Team"');
+    expect(html).not.toContain('>Max</span>');
+  });
+
+  test('omits the badge when no plan is known', async () => {
+    await i18n.changeLanguage('en');
+    const html = renderLedger({ name: 'claude-a.json', type: 'claude' }, observedRow);
+    expect(html).not.toContain('Plan:');
   });
 });

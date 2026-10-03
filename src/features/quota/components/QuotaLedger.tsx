@@ -10,7 +10,9 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
-import type { ResolvedTheme } from '@/types';
+import { PlanBadge } from '@/features/authFiles/components/PlanBadge';
+import { resolveAuthFilePlan } from '@/features/authFiles/plan';
+import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { formatInstantShort, formatRelativeInstant, resolveQuotaErrorMessage } from '@/utils/quota';
 import { getQuotaDisplayName } from '@/utils/quota/identity';
 import { maskIdentity, type LedgerCredential, type LedgerWindow } from '../ledgerModel';
@@ -50,6 +52,22 @@ const planLabel = (
   if (provider === 'claude') return t(`claude_quota.${planType}`, { defaultValue: '' }) || null;
   if (provider === 'codex') return t(`codex_quota.plan_${planType}`, { defaultValue: planType });
   return null;
+};
+
+/**
+ * Live quota reports the freshest plan; until it is loaded, fall back to the plan
+ * the backend recorded on the credential so observed rows still show it.
+ */
+const rowPlanLabel = (
+  t: TFunction,
+  provider: QuotaProviderType,
+  livePlanType: string | null,
+  file: AuthFileItem
+): string | null => {
+  const live = planLabel(t, provider, livePlanType);
+  if (live) return live;
+  const recorded = resolveAuthFilePlan(file);
+  return recorded ? t(recorded.labelKey, { defaultValue: recorded.fallback }) : null;
 };
 
 function groupByProvider(items: LedgerItem[]): [QuotaProviderType, LedgerItem[]][] {
@@ -111,7 +129,7 @@ export function QuotaLedger({
     const loading = status === 'loading';
     const name = getQuotaDisplayName(entry.file);
     const shownName = showIdentities ? name : maskIdentity(name);
-    const plan = planLabel(t, entry.type, row.planType);
+    const plan = rowPlanLabel(t, entry.type, row.planType, entry.file);
     const isNext = nextPickKeys.has(credential.key);
     const errorMessage =
       status === 'error'
@@ -125,7 +143,7 @@ export function QuotaLedger({
             {shownName}
           </span>
           <span className={styles.meta}>
-            {plan && <span className={styles.plan}>{plan}</span>}
+            {plan && <PlanBadge label={plan} />}
             {isNext && (
               <span className={styles.next} title={t('quota_management.ledger_next_hint')}>
                 {t('quota_management.ledger_next')}
