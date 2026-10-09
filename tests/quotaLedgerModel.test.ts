@@ -128,6 +128,47 @@ describe('observed Codex quota', () => {
   });
 });
 
+describe('observed xAI quota', () => {
+  const xaiFile = (signals: Record<string, string>): AuthFileItem => ({
+    name: 'xai-a@example.com.json',
+    type: 'xai',
+    quota: { observed_at: iso(NOW - HOUR), signals },
+  });
+
+  test('reads the polled billing window', () => {
+    const data = observedLedgerData(
+      'xai',
+      xaiFile({
+        'X-Xai-Billing-Period-Type': 'weekly',
+        'X-Xai-Billing-Used-Percent': '37.5',
+        'X-Xai-Billing-Reset-At': unix(NOW + 2 * DAY),
+        'X-Xai-Billing-Window-Minutes': '10080',
+      }),
+      NOW
+    );
+    expect(data?.source).toBe('observed');
+    expect(data?.observedAtMs).toBe(NOW - HOUR);
+    expect(data?.windows).toEqual([
+      {
+        id: 'xai-weekly',
+        labelKey: 'quota_management.ledger_window_weekly',
+        remaining: 62.5,
+        resetAtMs: Math.floor((NOW + 2 * DAY) / 1000) * 1000,
+        periodHours: 168,
+      },
+    ]);
+  });
+
+  test('defaults to the monthly period and ignores snapshots without billing signals', () => {
+    const [window] =
+      observedLedgerData('xai', xaiFile({ 'X-Xai-Billing-Used-Percent': '90' }), NOW)?.windows ??
+      [];
+    expect(window.id).toBe('xai-monthly');
+    expect(window.remaining).toBe(10);
+    expect(observedLedgerData('xai', xaiFile({ 'Retry-After': '60' }), NOW)).toBeNull();
+  });
+});
+
 describe('resolveLedgerRow', () => {
   const file = claudeFile({
     quota: {
@@ -157,6 +198,37 @@ describe('resolveLedgerRow', () => {
       'observed'
     );
     expect(resolveLedgerRow('claude', file, undefined, NOW).windows[0].remaining).toBe(50);
+  });
+
+  test('overlays an observed snapshot recorded after the live fetch', () => {
+    const live = {
+      status: 'success',
+      planType: 'plan_max',
+      fetchedAtMs: NOW - 2 * HOUR,
+      windows: [
+        { id: 'seven-day', usedPercent: 10, resetAtMs: NOW + DAY, periodHours: 168 },
+        { id: 'seven-day-opus', usedPercent: 30, resetAtMs: NOW + DAY, periodHours: 168 },
+      ],
+    };
+    const row = resolveLedgerRow('claude', file, live, NOW);
+    expect(row.source).toBe('observed');
+    expect(row.observedAtMs).toBe(NOW - HOUR);
+    expect(row.planType).toBe('plan_max');
+    expect(row.windows.map((w) => [w.id, w.remaining])).toEqual([
+      ['seven-day', 50],
+      ['seven-day-opus', 70],
+    ]);
+  });
+
+  test('keeps a live reading fetched after the observed snapshot', () => {
+    const live = {
+      status: 'success',
+      fetchedAtMs: NOW - 30 * 60 * 1000,
+      windows: [{ id: 'seven-day', usedPercent: 10, resetAtMs: NOW + DAY, periodHours: 168 }],
+    };
+    const row = resolveLedgerRow('claude', file, live, NOW);
+    expect(row.source).toBe('live');
+    expect(row.windows[0].remaining).toBe(90);
   });
 
   test('reports nothing for providers without data', () => {

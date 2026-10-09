@@ -28,3 +28,10 @@ export type QuotaViewMode = (typeof QUOTA_VIEW_MODES)[number];
 
 /** 与 useRevealGroup 的 GROUP_MAX_TOTAL 一致：卡片级联总预算 360ms。 */
 export const CARD_ENTRANCE_BUDGET_MS = 360;
+
+/**
+ * How often the open quota page silently re-reads the credential list, so
+ * backend quota snapshots (traffic or the background quota poll) show up
+ * without a manual refresh. Local management call only; no provider requests.
+ */
+export const QUOTA_FILES_REFRESH_MS = 60_000;

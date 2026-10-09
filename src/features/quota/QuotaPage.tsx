@@ -6,6 +6,9 @@
  * - cacheGeneration 会话隔离 + request-id 去重（见 useQuotaBatchLoader）；
  * - 文件列表变化后按 provider 剪枝额度缓存（已删文件不残留）；
  * - useHeaderRefresh 单槽位：本页唯一注册者，全局刷新 = 重取文件列表。
+ * - While open, the file list is re-read in the background every
+ *   QUOTA_FILES_REFRESH_MS so backend quota snapshots stay current. Background
+ *   reads never show the loading state and never trigger provider quota fetches.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +20,7 @@ import { IconSearch, IconX } from '@/components/ui/icons';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useConfigStore, useQuotaStore, useThemeStore } from '@/stores';
@@ -30,6 +34,7 @@ import { QuotaLedger, type LedgerItem } from './components/QuotaLedger';
 import { QuotaSummaryStrip } from './components/QuotaSummaryStrip';
 import {
   CARD_ENTRANCE_BUDGET_MS,
+  QUOTA_FILES_REFRESH_MS,
   QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
@@ -99,34 +104,57 @@ export function QuotaPage() {
   const sessionGeneration = useQuotaStore((state) => state.cacheGeneration);
   const [filesGeneration, setFilesGeneration] = useState<number | null>(null);
   const listRequestRef = useRef(0);
-  const loadFiles = useCallback(async () => {
-    const requestId = ++listRequestRef.current;
-    if (connectionStatus !== 'connected') {
-      setFiles([]);
-      setFilesGeneration(null);
-      setLoading(false);
-      return;
-    }
-    const isCurrent = () =>
-      requestId === listRequestRef.current &&
-      sessionGeneration === useQuotaStore.getState().cacheGeneration;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await authFilesApi.list();
-      if (!isCurrent()) return;
-      setFiles(data?.files || []);
-      setFilesGeneration(sessionGeneration);
-    } catch (err: unknown) {
-      if (!isCurrent()) return;
-      const message = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(message);
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [connectionStatus, sessionGeneration, t]);
+  // A foreground load owns the loading state; a background read never preempts it.
+  const foregroundLoadRef = useRef(false);
+  const loadFiles = useCallback(
+    async (options?: { background?: boolean }) => {
+      const background = options?.background === true;
+      if (background && (foregroundLoadRef.current || connectionStatus !== 'connected')) return;
+      const requestId = ++listRequestRef.current;
+      if (connectionStatus !== 'connected') {
+        setFiles([]);
+        setFilesGeneration(null);
+        setLoading(false);
+        return;
+      }
+      const isCurrent = () =>
+        requestId === listRequestRef.current &&
+        sessionGeneration === useQuotaStore.getState().cacheGeneration;
+      if (!background) {
+        foregroundLoadRef.current = true;
+        setLoading(true);
+        setError('');
+      }
+      try {
+        const data = await authFilesApi.list();
+        if (!isCurrent()) return;
+        setFiles(data?.files || []);
+        setFilesGeneration(sessionGeneration);
+        if (background) setError('');
+      } catch (err: unknown) {
+        // A failed background read keeps the current list; the next tick retries.
+        if (!isCurrent() || background) return;
+        const message = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(message);
+      } finally {
+        if (!background && isCurrent()) {
+          foregroundLoadRef.current = false;
+          setLoading(false);
+        }
+      }
+    },
+    [connectionStatus, sessionGeneration, t]
+  );
 
   useHeaderRefresh(loadFiles);
+
+  useInterval(
+    () => {
+      if (document.visibilityState === 'hidden') return;
+      void loadFiles({ background: true });
+    },
+    connectionStatus === 'connected' ? QUOTA_FILES_REFRESH_MS : null
+  );
 
   useEffect(() => {
     void loadFiles();

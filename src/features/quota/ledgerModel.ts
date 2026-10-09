@@ -7,10 +7,15 @@
  * - live: the provider state fetched on demand through the api-call proxy;
  * - observed: the passive quota snapshot the backend records from upstream
  *   response headers on ordinary traffic (`quota` / `model_quotas` on each
- *   auth-file entry). It costs no upstream request, so rows have data before
- *   anyone clicks refresh. Only Claude and Codex emit these headers.
+ *   auth-file entry), or from its optional background quota poll. It costs no
+ *   upstream request here, so rows have data before anyone clicks refresh.
+ *   Claude and Codex emit these headers; xAI billing signals (`x-xai-billing-*`)
+ *   come only from the backend poll.
  *
- * Live data always wins when it is loaded.
+ * Live data wins while it is the newer reading. When the backend records a
+ * snapshot after the live fetch, the snapshot's windows replace the live ones
+ * with the same id and the live-only windows (which the snapshot cannot carry)
+ * are kept.
  */
 
 import type { AuthFileItem } from '@/types';
@@ -342,15 +347,47 @@ function observedCodexWindows(snapshot: SignalSnapshot, nowMs: number): LedgerWi
   return windows;
 }
 
+/** The single billing window the backend poll derives from the xAI billing endpoints. */
+function observedXaiWindows(snapshot: SignalSnapshot, nowMs: number): LedgerWindow[] {
+  const read = (suffix: string) => snapshot.signals.get(`x-xai-billing-${suffix}`);
+  const periodType = read('period-type') === 'weekly' ? 'weekly' : 'monthly';
+  const used = parseNumber(read('used-percent'));
+  const resetAtMs = parseInstantMs(read('reset-at'));
+  const minutes = parseNumber(read('window-minutes'));
+  if (used === null && resetAtMs === null) return [];
+  return [
+    settleWindow(
+      {
+        id: `xai-${periodType}`,
+        labelKey: `quota_management.ledger_window_${periodType}`,
+        remaining: used === null ? null : clampPercent(100 - used),
+        resetAtMs,
+        periodHours: minutes === null ? null : minutes / 60,
+      },
+      nowMs
+    ),
+  ];
+}
+
 /** Observed quota for a credential, or null when the backend recorded none. */
 export function observedLedgerData(
   provider: QuotaProviderType,
   file: AuthFileItem,
   nowMs: number
 ): LedgerRowData | null {
-  if (provider !== 'claude' && provider !== 'codex') return null;
+  if (provider !== 'claude' && provider !== 'codex' && provider !== 'xai') return null;
   const snapshots = readSnapshots(file);
   if (snapshots.length === 0) return null;
+
+  if (provider === 'xai') {
+    const snapshot = snapshots.find((candidate) =>
+      [...candidate.signals.keys()].some((key) => key.startsWith('x-xai-billing-'))
+    );
+    if (!snapshot) return null;
+    const windows = observedXaiWindows(snapshot, nowMs);
+    if (windows.length === 0) return null;
+    return { source: 'observed', windows, planType: null, observedAtMs: snapshot.observedAtMs };
+  }
 
   if (provider === 'claude') {
     const windows = observedClaudeWindows(snapshots, nowMs);
@@ -375,24 +412,58 @@ export function observedLedgerData(
   };
 }
 
-/** Live data when loaded, otherwise the observed snapshot, otherwise nothing. */
+/**
+ * Overlays a newer observed snapshot on an older live reading: observed windows
+ * replace live windows with the same id in place, live-only windows are kept,
+ * and observed-only windows are appended.
+ */
+function overlayObserved(live: LedgerRowData, observed: LedgerRowData): LedgerRowData {
+  const observedById = new Map(observed.windows.map((window) => [window.id, window]));
+  const windows = live.windows.map((window) => {
+    const replacement = observedById.get(window.id);
+    if (!replacement) return window;
+    observedById.delete(window.id);
+    return replacement;
+  });
+  return {
+    source: 'observed',
+    windows: [...windows, ...observedById.values()],
+    planType: live.planType ?? observed.planType,
+    observedAtMs: observed.observedAtMs,
+  };
+}
+
+/**
+ * The newer of the live reading and the observed snapshot (see the module
+ * comment), whichever exists, otherwise nothing.
+ */
 export function resolveLedgerRow(
   provider: QuotaProviderType,
   file: AuthFileItem,
   quota: unknown,
   nowMs: number
 ): LedgerRowData {
+  const observed = observedLedgerData(provider, file, nowMs);
   const live = liveLedgerWindows(provider, quota);
   if (live !== null) {
-    return {
+    const liveRow: LedgerRowData = {
       source: 'live',
       windows: live.map((window) => settleWindow(window, nowMs)),
       planType: livePlanType(provider, quota),
       observedAtMs: null,
     };
+    const fetchedAtMs = toRecord(quota)?.fetchedAtMs;
+    if (
+      observed?.observedAtMs != null &&
+      isFiniteNumber(fetchedAtMs) &&
+      observed.observedAtMs > fetchedAtMs
+    ) {
+      return overlayObserved(liveRow, observed);
+    }
+    return liveRow;
   }
   return (
-    observedLedgerData(provider, file, nowMs) ?? {
+    observed ?? {
       source: 'none',
       windows: [],
       planType: null,
