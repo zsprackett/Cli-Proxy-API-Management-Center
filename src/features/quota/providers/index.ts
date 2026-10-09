@@ -31,6 +31,8 @@ export interface QuotaCardState {
   status: 'idle' | 'loading' | 'success' | 'error';
   error?: string;
   errorStatus?: number;
+  /** When a success state was fetched, so the ledger can tell it from a newer backend snapshot. */
+  fetchedAtMs?: number;
 }
 
 export interface QuotaAdapter {
@@ -49,17 +51,23 @@ export interface QuotaAdapter {
   Body: ComponentType<QuotaBodyProps<QuotaCardState>>;
 }
 
+/** Stamps every success state with its fetch time; all live writes go through these adapters. */
+const withFetchedAt = (adapter: QuotaAdapter): QuotaAdapter => ({
+  ...adapter,
+  buildSuccessState: (data) => ({ ...adapter.buildSuccessState(data), fetchedAtMs: Date.now() }),
+});
+
 export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
-  antigravity: {
+  antigravity: withFetchedAt({
     ...ANTIGRAVITY_CONFIG,
     Body: AntigravityQuotaBody,
-  } as unknown as QuotaAdapter,
-  claude: { ...CLAUDE_CONFIG, Body: ClaudeQuotaBody } as unknown as QuotaAdapter,
-  codex: { ...CODEX_CONFIG, Body: CodexQuotaBody } as unknown as QuotaAdapter,
-  devin: { ...DEVIN_CONFIG, Body: DevinQuotaBody } as unknown as QuotaAdapter,
-  kimi: { ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter,
-  meta: { ...META_CONFIG, Body: MetaQuotaBody } as unknown as QuotaAdapter,
-  xai: { ...XAI_CONFIG, Body: XaiQuotaBody } as unknown as QuotaAdapter,
+  } as unknown as QuotaAdapter),
+  claude: withFetchedAt({ ...CLAUDE_CONFIG, Body: ClaudeQuotaBody } as unknown as QuotaAdapter),
+  codex: withFetchedAt({ ...CODEX_CONFIG, Body: CodexQuotaBody } as unknown as QuotaAdapter),
+  devin: withFetchedAt({ ...DEVIN_CONFIG, Body: DevinQuotaBody } as unknown as QuotaAdapter),
+  kimi: withFetchedAt({ ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter),
+  meta: withFetchedAt({ ...META_CONFIG, Body: MetaQuotaBody } as unknown as QuotaAdapter),
+  xai: withFetchedAt({ ...XAI_CONFIG, Body: XaiQuotaBody } as unknown as QuotaAdapter),
 };
 
 export type QuotaMapUpdater = (
