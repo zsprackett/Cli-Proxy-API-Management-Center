@@ -467,17 +467,34 @@ export function resolveXaiSubscriptionPlan(
   return { label, tier: planTier };
 }
 
+/**
+ * True while `nowMs` falls inside the reported period. Used to read an omitted
+ * creditUsagePercent: it is an implicit-presence proto3 float, so xAI drops it
+ * at zero, and Grok's own clients read the omission in an active period as 0%.
+ */
+function isXaiPeriodActive(period: XaiBillingPeriod | null, nowMs: number): boolean {
+  const startMs = resolveResetMs([period?.start]);
+  const endMs = resolveResetMs([period?.end]);
+  return startMs !== null && endMs !== null && startMs <= nowMs && nowMs < endMs;
+}
+
 export function buildXaiBillingSummary(
-  config: XaiBillingConfig | null | undefined
+  config: XaiBillingConfig | null | undefined,
+  nowMs: number = Date.now()
 ): XaiBillingSummary | null {
   if (!config || typeof config !== 'object') return null;
 
   const summary = emptyXaiBillingSummary();
   const currentPeriod = config.currentPeriod ?? config.current_period ?? null;
   const periodType = resolveXaiPeriodType(currentPeriod);
-  const creditUsagePercent = normalizeNumberValue(
-    config.creditUsagePercent ?? config.credit_usage_percent
-  );
+  const rawCreditUsagePercent = config.creditUsagePercent ?? config.credit_usage_percent;
+  // Only an omitted value reads as zero; a malformed one stays unknown.
+  const creditUsagePercent =
+    rawCreditUsagePercent == null
+      ? isXaiPeriodActive(currentPeriod, nowMs)
+        ? 0
+        : null
+      : normalizeNumberValue(rawCreditUsagePercent);
   const periodStart =
     normalizeStringValue(currentPeriod?.start) ??
     normalizeStringValue(config.billingPeriodStart ?? config.billing_period_start) ??
