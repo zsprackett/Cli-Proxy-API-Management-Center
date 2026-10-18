@@ -40,7 +40,7 @@ export const emptyFeed = (): RequestFeed => ({
 
 const byNewest = (a: RequestEntry, b: RequestEntry) => b.seq - a.seq;
 
-const lowestSeq = (rows: RequestEntry[]) => rows.at(-1)?.seq ?? 0;
+const lowestSeq = (rows: RequestEntry[]) => rows[rows.length - 1]?.seq ?? 0;
 
 export function feedFromPage(page: RequestPage): RequestFeed {
   const rows = [...page.entries].sort(byNewest).slice(0, MAX_ROWS);
@@ -127,6 +127,9 @@ export const DEFAULT_CONTROLS: RequestControls = {
   verdicts: [],
   range: 'all',
 };
+
+export const isFiltered = (controls: RequestControls): boolean =>
+  JSON.stringify(controls) !== JSON.stringify(DEFAULT_CONTROLS);
 
 export function requestFilterFromControls(controls: RequestControls, nowMs: number): RequestFilter {
   const filter: RequestFilter = {};
