@@ -39,7 +39,12 @@ export function SessionList({ sessions, labels, onSelectSession }: SessionListPr
         {sessions.map((session) => {
           const client = labels.get(session.keyHash) ?? '';
           return (
-            <TableRow key={session.sessionId} data-session={session.sessionId}>
+            <TableRow
+              key={session.sessionId}
+              data-session={session.sessionId}
+              className={styles.clickableRow}
+              onClick={() => onSelectSession?.(session.sessionId)}
+            >
               <TableCell className={styles.nowrap}>
                 {session.lastAtMs
                   ? new Date(session.lastAtMs).toLocaleString(i18n.language, {
@@ -54,7 +59,10 @@ export function SessionList({ sessions, labels, onSelectSession }: SessionListPr
                   className={styles.sessionLink}
                   title={session.sessionId}
                   aria-label={t('request_log.session_open', { id: shortId(session.sessionId) })}
-                  onClick={() => onSelectSession?.(session.sessionId)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectSession?.(session.sessionId);
+                  }}
                 >
                   {shortId(session.sessionId)}
                 </button>

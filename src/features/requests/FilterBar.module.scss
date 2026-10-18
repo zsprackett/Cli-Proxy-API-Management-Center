@@ -23,6 +23,13 @@
   color: var(--text-secondary);
 }
 
+// Matches the height of the small Select beside it.
+.sessionInput {
+  height: 28px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
 .verdicts {
   max-width: none;
   flex: 0 1 auto;

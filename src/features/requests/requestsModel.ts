@@ -287,7 +287,15 @@ export function sessionTimeline(entries: readonly RequestEntry[]): TimelineBar[]
 
 // Formatting
 
-export const shortId = (id: string): string => id.slice(0, 8);
+/**
+ * Short session label: the backend prefixes ids with the provider
+ * ("claude:<uuid>") and appends ":agent:<id>" for subagents.
+ */
+export const shortId = (id: string): string => {
+  const [main, agent] = id.replace(/^[a-z]+:(?=.)/i, '').split(':agent:');
+  const head = main.slice(0, 8);
+  return agent ? `${head} › ${agent.slice(0, 6)}` : head;
+};
 
 export function formatLatency(ms: number): string {
   if (!ms) return '-';

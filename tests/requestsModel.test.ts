@@ -253,8 +253,15 @@ describe('formatting', () => {
     expect(formatSpan(3600)).toBe('1 h');
   });
 
-  test('shortId keeps the first eight characters', () => {
+  test('shortId keeps the first eight characters of the conversation id', () => {
     expect(shortId('6c1d2e3f-aaaa-bbbb')).toBe('6c1d2e3f');
     expect(shortId('')).toBe('');
+  });
+
+  test('shortId drops the provider prefix and keeps a short subagent id', () => {
+    expect(shortId('claude:6cf9a5f1-7238-431b-9c4d-3f5e48a7e6c0')).toBe('6cf9a5f1');
+    expect(shortId('claude:6cf9a5f1-7238-431b-9c4d-3f5e48a7e6c0:agent:a97ace3c6eaef4e66')).toBe(
+      '6cf9a5f1 › a97ace'
+    );
   });
 });

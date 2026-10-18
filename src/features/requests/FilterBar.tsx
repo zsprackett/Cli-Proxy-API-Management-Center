@@ -54,8 +54,10 @@ export function FilterBar({
     <div className={styles.bar} role="search">
       {scope === 'requests' ? (
         <div className={styles.field}>
+          <span className={styles.label}>{t('request_log.filter_session')}</span>
           <Input
-            label={t('request_log.filter_session')}
+            aria-label={t('request_log.filter_session')}
+            className={styles.sessionInput}
             value={controls.session}
             onChange={(event) => set('session', event.target.value)}
             spellCheck={false}
