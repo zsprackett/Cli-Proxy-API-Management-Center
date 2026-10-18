@@ -14,6 +14,9 @@ import {
   sessionTimeline,
   verdictKey,
   DEFAULT_CONTROLS,
+  formatLatency,
+  formatSpan,
+  shortId,
 } from '@/features/requests/requestsModel';
 import { apiKeyNameFingerprint } from '@/features/config/apiKeyNames';
 import { clientKeyHash } from '@/features/quota/forecast/forecastModel';
@@ -231,5 +234,27 @@ describe('sessionTimeline', () => {
     const bars = sessionTimeline(entries);
     expect(bars.map((bar) => bar.seq)).toEqual([1, 2]);
     expect(bars[1].heightPct).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('formatting', () => {
+  test('formatLatency uses ms below a second and seconds above', () => {
+    expect(formatLatency(0)).toBe('-');
+    expect(formatLatency(820)).toBe('820 ms');
+    expect(formatLatency(1410)).toBe('1.4 s');
+    expect(formatLatency(18320)).toBe('18 s');
+  });
+
+  test('formatSpan picks seconds, minutes or hours', () => {
+    expect(formatSpan(0)).toBe('0 s');
+    expect(formatSpan(41)).toBe('41 s');
+    expect(formatSpan(300)).toBe('5 m');
+    expect(formatSpan(4210)).toBe('1.2 h');
+    expect(formatSpan(3600)).toBe('1 h');
+  });
+
+  test('shortId keeps the first eight characters', () => {
+    expect(shortId('6c1d2e3f-aaaa-bbbb')).toBe('6c1d2e3f');
+    expect(shortId('')).toBe('');
   });
 });

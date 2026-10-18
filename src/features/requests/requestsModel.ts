@@ -281,3 +281,20 @@ export function sessionTimeline(entries: readonly RequestEntry[]): TimelineBar[]
     };
   });
 }
+
+// Formatting
+
+export const shortId = (id: string): string => id.slice(0, 8);
+
+export function formatLatency(ms: number): string {
+  if (!ms) return '-';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const seconds = ms / 1000;
+  return `${Number(seconds.toFixed(seconds < 10 ? 1 : 0))} s`;
+}
+
+export function formatSpan(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} m`;
+  return `${Number((seconds / 3600).toFixed(1))} h`;
+}
